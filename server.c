@@ -1,19 +1,30 @@
+#include <errno.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <unistd.h>
+#include <wait.h>
 
 #define PORT "8080"
+
+void reap_chld(int s) {
+  int saved_errno = errno;
+  while (waitpid(-1, NULL, WNOHANG) > 0)
+    ;
+  errno = saved_errno;
+}
 
 int main() {
   int status;
   struct addrinfo hints, *servinfo, *curr;
   int sockfd, their_fd;
   int yes = 1;
-  struct sockaddr their_addr;
+  struct sockaddr_storage their_addr;
+  struct sigaction sa;
   socklen_t their_addr_len;
 
   memset(&hints, 0, sizeof(hints));
@@ -59,17 +70,37 @@ int main() {
     exit(1);
   }
 
-  their_addr_len = sizeof(their_addr);
+  printf("Listening on port: %s\n", PORT);
 
-  if ((their_fd = accept(sockfd, &their_addr, &their_addr_len)) == -1) {
-    perror("accept: ");
+  sa.sa_handler = reap_chld;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_RESTART;
+  if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+    perror("sigaction");
+    exit(1);
   }
 
-  if (send(their_fd, "Hello!", 6, 0) == -1) {
-    perror("send: ");
+  while (1) {
+
+    their_addr_len = sizeof(their_addr);
+    if ((their_fd = accept(sockfd, (struct sockaddr *)&their_addr, &their_addr_len)) == -1) {
+      perror("accept: ");
+      continue;
+    }
+
+    if (!fork()) {
+      // Child process
+      close(sockfd);
+      if (send(their_fd, "Hello!", 6, 0) == -1) {
+        perror("send: ");
+      }
+      close(their_fd);
+      exit(0);
+    }
+
+    close(their_fd);
   }
 
-  close(their_fd);
   close(sockfd);
 
   return 0;
