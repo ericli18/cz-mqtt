@@ -2,21 +2,29 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 #define PORT "8080"
+#define MAXBUFSIZE 100
 
 int main() {
   int status;
   struct addrinfo hints, *servinfo, *curr;
   int sockfd;
   int yes = 1;
-  struct sockaddr their_addr;
-  socklen_t their_addr_len;
+  char buf[MAXBUFSIZE];
+  int numBytes;
+  char s[INET6_ADDRSTRLEN];
+  
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_family = AF_UNSPEC;
 
   if ((status = getaddrinfo("localhost", PORT, &hints, &servinfo)) != 0) {
     fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
+    return 1;
   }
 
   for (curr = servinfo; curr != NULL; curr = curr->ai_next) {
@@ -42,14 +50,14 @@ int main() {
     exit(1);
   }
 
-  char message[100];
-  int message_size = 100;
-
-  if (recv(sockfd, message, message_size, 0) == -1) {
+  if ((numBytes = recv(sockfd, buf, MAXBUFSIZE - 1, 0)) == -1) {
     perror("recv: ");
+    exit(1);
   }
+  
+  buf[numBytes] = '\0';
 
-  printf("%s\n", message);
+  printf("recieved: %s\n", buf);
 
   close(sockfd);
 
