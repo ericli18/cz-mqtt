@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -10,6 +11,16 @@
 #include <wait.h>
 
 #define PORT "8080"
+
+void* getaddr(struct sockaddr* sa)
+{
+  if(sa->sa_family == AF_INET)
+  {
+    return &(((struct sockaddr_in *)sa) -> sin_addr);
+  }
+  
+  return &(((struct sockaddr_in6*)sa) -> sin6_addr);
+}
 
 void reap_chld(int s) {
   int saved_errno = errno;
@@ -26,6 +37,7 @@ int main() {
   struct sockaddr_storage their_addr;
   struct sigaction sa;
   socklen_t their_addr_len;
+  char s[INET6_ADDRSTRLEN];
 
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
@@ -87,6 +99,10 @@ int main() {
       perror("accept: ");
       continue;
     }
+    
+    inet_ntop(their_addr.ss_family, getaddr((struct sockaddr*)&their_addr), s, sizeof(s));
+    
+    printf("received connection from: %s\n", s);
 
     if (!fork()) {
       // Child process

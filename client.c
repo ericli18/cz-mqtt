@@ -1,3 +1,4 @@
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -8,6 +9,16 @@
 
 #define PORT "8080"
 #define MAXBUFSIZE 100
+
+void* getaddr(struct sockaddr* sa)
+{
+  if(sa->sa_family == AF_INET)
+  {
+    return &(((struct sockaddr_in *)sa) -> sin_addr);
+  }
+  
+  return &(((struct sockaddr_in6*)sa) -> sin6_addr);
+}
 
 int main() {
   int status;
@@ -43,12 +54,16 @@ int main() {
     break;
   }
 
-  freeaddrinfo(servinfo);
-
   if (curr == NULL) {
     fprintf(stderr, "connect: socket failed to connect");
     exit(1);
   }
+  
+  inet_ntop(curr->ai_family, getaddr(curr->ai_addr), s, sizeof(s));
+  
+  printf("connected to: %s\n", s);
+
+  freeaddrinfo(servinfo);
 
   if ((numBytes = recv(sockfd, buf, MAXBUFSIZE - 1, 0)) == -1) {
     perror("recv: ");
