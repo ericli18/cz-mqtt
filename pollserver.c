@@ -57,37 +57,47 @@ int listener() {
 
 int main() {
   int listen_fd = listener();
-  if(listen_fd == -1)
-  {
+  if (listen_fd == -1) {
     fprintf(stderr, "Error getting listening socket\n");
     exit(1);
   }
+
+  struct sockaddr_storage incoming_addr;
+  socklen_t addrlen;
 
   int fd_count = 0;
   int fd_size = 5;
 
   struct pollfd *pfds = malloc(sizeof(struct pollfd) * fd_size);
-  
-  if(pfds == NULL)
-  {
+
+  if (pfds == NULL) {
     perror("error assigning pfds: ");
     exit(1);
   }
-  
+
   pfds[0].fd = listen_fd;
   pfds[0].events = POLLIN;
-  
-  fd_count = 1; //added the first file descriptor
-  
-  while(1)
-  {
+
+  fd_count = 1; // added the first file descriptor
+
+  while (1) {
     int responses = poll(pfds, fd_count, -1);
+    if (responses == -1) {
+      perror("poll: ");
+      exit(1);
+    }
+    // Listener socket
+    if (pfds[0].revents & POLLIN) {
+      addrlen = sizeof(incoming_addr);
+      int newfd;
 
-    
+      newfd = accept(listen_fd, (struct sockaddr *)&incoming_addr, &addrlen);
+
+      if (newfd == -1) {
+        perror("add socket: accept: ");
+      }
+    }
   }
-  
-
-
 
   return 0;
 }

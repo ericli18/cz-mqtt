@@ -1,5 +1,5 @@
-#include <errno.h>
 #include <arpa/inet.h>
+#include <errno.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -10,16 +10,64 @@
 #include <unistd.h>
 #include <wait.h>
 
-#define PORT "8080"
+#define PORT "31415"
 
-void* getaddr(struct sockaddr* sa)
-{
-  if(sa->sa_family == AF_INET)
-  {
-    return &(((struct sockaddr_in *)sa) -> sin_addr);
+void *getaddr(struct sockaddr *sa) {
+  if (sa->sa_family == AF_INET) {
+    return &(((struct sockaddr_in *)sa)->sin_addr);
   }
-  
-  return &(((struct sockaddr_in6*)sa) -> sin6_addr);
+
+  return &(((struct sockaddr_in6 *)sa)->sin6_addr);
+}
+
+int get_socket(void) {
+  int listener_fd;
+  int yes = 1;
+  int status;
+
+  struct addrinfo hints, *info, *curr;
+
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_PASSIVE;
+
+  if ((status = getaddrinfo(NULL, PORT, &hints, &info)) != 0) {
+    fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
+    exit(1);
+  }
+
+  // no error checking here
+
+  for (curr = info; curr != NULL; curr = curr->ai_next) {
+    if ((listener_fd = socket(curr->ai_family, curr->ai_socktype,
+                              curr->ai_protocol)) == -1) {
+      continue;
+    }
+
+    setsockopt(listener_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+
+    if (bind(listener_fd, curr->ai_addr, curr->ai_addrlen) == -1) {
+      close(listener_fd);
+      continue;
+    }
+
+    break;
+  }
+
+  freeaddrinfo(info);
+
+  // something would have failed above, so we looped through everything;
+
+  if (curr == NULL) {
+    return -1;
+  }
+
+  if (listen(listener_fd, 1) == -1) {
+    return -1;
+  }
+
+  return listener_fd;
 }
 
 void reap_chld(int s) {
@@ -95,13 +143,15 @@ int main() {
   while (1) {
 
     their_addr_len = sizeof(their_addr);
-    if ((their_fd = accept(sockfd, (struct sockaddr *)&their_addr, &their_addr_len)) == -1) {
+    if ((their_fd = accept(sockfd, (struct sockaddr *)&their_addr,
+                           &their_addr_len)) == -1) {
       perror("accept: ");
       continue;
     }
-    
-    inet_ntop(their_addr.ss_family, getaddr((struct sockaddr*)&their_addr), s, sizeof(s));
-    
+
+    inet_ntop(their_addr.ss_family, getaddr((struct sockaddr *)&their_addr), s,
+              sizeof(s));
+
     printf("received connection from: %s\n", s);
 
     if (!fork()) {
