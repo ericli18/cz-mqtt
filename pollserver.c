@@ -1,5 +1,7 @@
+#include <arpa/inet.h>
 #include <asm-generic/socket.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,7 +20,7 @@ int create_listener_socket() {
 
   memset(&hints, 0, sizeof(hints));
   hints.ai_socktype = SOCK_STREAM;
-  hints.ai_family = AF_UNSPEC;
+  hints.ai_family = AF_INET;
   hints.ai_flags = AI_PASSIVE;
 
   if ((getaddrinfo_status =
@@ -61,6 +63,14 @@ int create_listener_socket() {
   return listener_socket;
 }
 
+void *get_addr_name(struct sockaddr *address) {
+  if (address->sa_family == AF_INET) {
+    return &(((struct sockaddr_in *)address)->sin_addr);
+  } else {
+    return &(((struct sockaddr_in6 *)address)->sin6_addr);
+  }
+}
+
 int add_to_poll_fds(struct pollfd **pfds, int new_fd, int *fd_count,
                     int *fd_size) {
   if (*fd_count == *fd_size) {
@@ -100,6 +110,7 @@ int main() {
   poll_fds[0].fd = listener_socket;
   poll_fds[0].events = POLLIN;
   active_fd_count = 1; // Listener socket added as first file descriptor
+  printf("Now listening!\n ");
 
   while (1) {
     int num_events = poll(poll_fds, active_fd_count, -1);
@@ -108,7 +119,8 @@ int main() {
       exit(1);
     }
 
-    // Check listener socket
+    // Check listener socket, we can just use 0 because of the way that we
+    // delete sockets
     if (poll_fds[0].revents & POLLIN) {
       client_addr_len = sizeof(client_addr);
       int new_client_socket;
@@ -117,10 +129,24 @@ int main() {
       if (new_client_socket == -1) {
         perror("Error accepting new connection: ");
       }
-      // TODO: Add new client socket to poll_fds array
+      char addr[INET6_ADDRSTRLEN];
+
+      inet_ntop(client_addr.ss_family,
+                get_addr_name((struct sockaddr *)&client_addr), addr,
+                sizeof(addr));
+
+      int status = add_to_poll_fds(&poll_fds, new_client_socket,
+                                   &active_fd_count, &poll_fd_capacity);
+      if (status == -1) {
+        fprintf(stderr, "There was a problem with an incoming connection: %s\n",
+                addr);
+      } else {
+        printf("%s is connected\n", addr);
+      }
     }
 
-    // TODO: Handle events on other sockets
+    for (int i = 1; i < active_fd_count; i++) {
+    }
   }
 
   return 0;
