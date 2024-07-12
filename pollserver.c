@@ -12,6 +12,7 @@
 
 #define PORT "3490"
 #define MAX_CONNECTIONS 10
+#define MAX_BUFFER_SIZE 256
 
 int create_listener_socket() {
   int listener_socket, getaddrinfo_status;
@@ -89,6 +90,11 @@ int add_to_poll_fds(struct pollfd **pfds, int new_fd, int *fd_count,
   return 0; // Success
 }
 
+void remove_from_pollfds(struct pollfd **pfds, int index, int *fd_count) {
+  pfds[index] = pfds[*fd_count - 1];
+  (*fd_count)--;
+}
+
 int main() {
   int listener_socket = create_listener_socket();
   if (listener_socket == -1) {
@@ -102,6 +108,8 @@ int main() {
   int poll_fd_capacity = 5;
   struct pollfd *poll_fds = malloc(sizeof(struct pollfd) * poll_fd_capacity);
 
+  char buffer[MAX_BUFFER_SIZE];
+
   if (poll_fds == NULL) {
     perror("Error allocating poll_fds: ");
     exit(1);
@@ -110,7 +118,7 @@ int main() {
   poll_fds[0].fd = listener_socket;
   poll_fds[0].events = POLLIN;
   active_fd_count = 1; // Listener socket added as first file descriptor
-  printf("Now listening!\n ");
+  printf("Now listening!\n");
 
   while (1) {
     int num_events = poll(poll_fds, active_fd_count, -1);
@@ -141,11 +149,35 @@ int main() {
         fprintf(stderr, "There was a problem with an incoming connection: %s\n",
                 addr);
       } else {
-        printf("%s is connected\n", addr);
+        printf("%s has connected\n", addr);
       }
     }
 
     for (int i = 1; i < active_fd_count; i++) {
+      if (poll_fds[i].revents & POLLIN) {
+        int bytes_read = recv(poll_fds[i].fd, &buffer, sizeof(buffer), 0);
+        if (bytes_read <= 0) {
+          if (bytes_read == 0) {
+            printf("Socket exited: %d\n", poll_fds[i].fd);
+          } else {
+            perror("recv: ");
+          }
+
+          close(poll_fds[i].fd);
+          remove_from_pollfds(&poll_fds, i, &active_fd_count);
+        } else {
+          buffer[bytes_read] = '\0';
+          printf("Socket %d said %s\n", poll_fds[i].fd, buffer);
+          for (int output = 1; output < active_fd_count; output++) {
+            if (output == i) {
+              continue;
+            }
+            if (send(poll_fds[output].fd, buffer, bytes_read, 0) == -1) {
+              perror("send: ");
+            }
+          }
+        }
+      }
     }
   }
 
