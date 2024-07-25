@@ -2,13 +2,8 @@ project('tutorial', 'c')
 executable('server', 'chatServer/pollserver.c')
 executable('client', 'chatServer/pollclient.c')
 
-msgpack_dep = dependency('msgpack-c')
+# msgpack_dep = dependency('msgpack-c')
+# executable('mytest', 'src/main.c', dependencies : [msgpack_dep])
 
-e = executable('prog', 'tests/test_main.c')
-test('test test', e, should_fail: true)
-
-test_src = ['tests/msgpack.c']
-test_exe = executable('test_msgpack', test_src,
-                      dependencies : [msgpack_dep])
-
-test('msgpack minunit test', test_exe)
+mqtt_test = executable('mqtt_test', 'tests/mqtt.c')
+test('mqtt_Test', mqtt_test)

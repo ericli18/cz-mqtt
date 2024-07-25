@@ -80,7 +80,26 @@ enum packet_type {
 // TODO: Set bits myself? will see in the future
 enum qos_level { AT_MOST_ONCE, AT_LEAST_ONCE, EXACTLY_ONCE };
 
-// ordered in little-endian
+/*
+ * Represents the first byte of the MQTT Fixed Header.
+ *
+ * This union allows access to the individual fields of the first byte
+ * of the MQTT fixed header, as well as the entire byte itself.
+ *
+ * +--------+---+---+---+---+---+---+---+---+
+ * | Bit    | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+ * +--------+---+---+---+---+---+---+---+---+
+ * | Byte 1 |    Type   | D | Q | Q | R |
+ * +--------+-----------+---+---+---+---+
+ *
+ * @field byte  The entire first byte of the fixed header.
+ * @field bits  A bitfield struct to access individual fields:
+ *              - retain: The MQTT RETAIN flag. If set, the server should hold
+ * on to the message.
+ *              - qos: Quality of Service level for the message (0, 1, or 2).
+ *              - dup: The DUP flag. If set, indicates a duplicate message.
+ *              - type: The MQTT Control Packet type (values 1-14).
+ */
 union mqtt_header {
   unsigned char byte;
   struct {
@@ -265,8 +284,10 @@ union mqtt_packet {
   struct mqtt_unsubscribe unsubscribe;
 };
 
+// Source: 2.2.3
 int mqtt_encode_length(unsigned char *, size_t);
-unsigned long long mqtt_decode_length(const unsigned char **);
+int mqtt_decode_length(const unsigned char **, unsigned long *);
+
 int unpack_mqtt_packet(const unsigned char *, union mqtt_packet *);
 unsigned char *pack_mqtt_packet(const union mqtt_packet *, unsigned);
 
