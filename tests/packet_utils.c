@@ -1,5 +1,6 @@
 #include "minunit.h"
 #include "../src/mqtt_packet_utils.h"
+#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -19,7 +20,7 @@ MU_TEST(test_pack_unpack_u8) {
     uint8_t original = 0xA5;
     mqtt_pack_u8(&buffer_ptr, original);
     buffer_ptr = test_buffer;
-    uint8_t unpacked = mqtt_unpack_u8(&buffer_ptr);
+    uint8_t unpacked = mqtt_unpack_u8((const uint8_t**)&buffer_ptr);
     mu_assert_int_eq(original, unpacked);
 }
 
@@ -27,7 +28,7 @@ MU_TEST(test_pack_unpack_u16) {
     uint16_t original = 0xA5B6;
     mqtt_pack_u16(&buffer_ptr, original);
     buffer_ptr = test_buffer;
-    uint16_t unpacked = mqtt_unpack_u16(&buffer_ptr);
+    uint16_t unpacked = mqtt_unpack_u16((const uint8_t**)&buffer_ptr);
     mu_assert_int_eq(original, unpacked);
 }
 
@@ -35,7 +36,7 @@ MU_TEST(test_pack_unpack_u32) {
     uint32_t original = 0xA5B6C7D8;
     mqtt_pack_u32(&buffer_ptr, original);
     buffer_ptr = test_buffer;
-    uint32_t unpacked = mqtt_unpack_u32(&buffer_ptr);
+    uint32_t unpacked = mqtt_unpack_u32((const uint8_t**)&buffer_ptr);
     mu_assert_int_eq(original, unpacked);
 }
 
@@ -44,7 +45,7 @@ MU_TEST(test_pack_unpack_variable_int) {
     mqtt_pack_variable_int(&buffer_ptr, original);
     buffer_ptr = test_buffer;
     int bytes_read;
-    uint32_t unpacked = mqtt_unpack_variable_int(&buffer_ptr, &bytes_read);
+    uint32_t unpacked = mqtt_unpack_variable_int((const uint8_t**)&buffer_ptr, &bytes_read);
     mu_assert_int_eq(original, unpacked);
     mu_assert_int_eq(2, bytes_read);
 }
@@ -55,7 +56,7 @@ MU_TEST(test_pack_unpack_string) {
     mqtt_pack_string(&buffer_ptr, original, length);
     buffer_ptr = test_buffer;
     uint16_t unpacked_length;
-    char* unpacked = mqtt_unpack_string(&buffer_ptr, &unpacked_length);
+    char* unpacked = mqtt_unpack_string((const uint8_t**)&buffer_ptr, &unpacked_length);
     mu_assert_string_eq(original, unpacked);
     mu_assert_int_eq(length, unpacked_length);
     free(unpacked);
@@ -73,7 +74,6 @@ MU_TEST(test_validate_utf8_invalid) {
 
 MU_TEST_SUITE(test_suite) {
     MU_SUITE_CONFIGURE(&test_setup, &test_teardown);
-
     MU_RUN_TEST(test_pack_unpack_u8);
     MU_RUN_TEST(test_pack_unpack_u16);
     MU_RUN_TEST(test_pack_unpack_u32);
