@@ -1,7 +1,7 @@
 # Meson build directory
 /build/
 /builddir/
-.cache/*
+.cache/
 
 # Meson subproject directories
 /subprojects/*
