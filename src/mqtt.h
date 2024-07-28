@@ -23,6 +23,7 @@
 #ifndef MQTT_H
 #define MQTT_H
 
+#include <stdint.h>
 #include <stdio.h>
 
 /*
@@ -110,40 +111,64 @@ union mqtt_header {
   } bits;
 };
 
-// Reference: 3.1.2 Variable header, beginning for connect
-/*
- * Represents an MQTT CONNECT packet structure.
- *
- * This struct encapsulates all the fields necessary for an MQTT CONNECT packet,
- * including the fixed header, connect flags, and variable header payload.
- *
- * @field header       The fixed header for the MQTT packet.
- * @field byte         A union member to access all connect flags as a single
- * byte.
- * @field bits         A bitfield struct to access individual connect flags:
- *                     - reserved: Reserved bit, must be 0.
- *                     - clean_session: If 0, Server must resume communications
- * with Client from current Session If 1, Client and Server must discard
- * previous Session and start new one
- *                     - will: If 1, Will topic and Will message MUST be in
- * payload and used by server If 0, Connect flags set to 0, Will MUST NOT be
- * present in the payload
- *                     - will_qos: QoS level for the Will message. Check will
- * flag
- *                     - will_retain: Will Retain flag. Check will flag
- *                     - password: Password flag. If 1, Password must be present
- * in payload Must be 0 if Username is 0
- *                     - username: Username flag. If 1, Username must be present
- * in payload
- * @field payload      The variable header and payload of the CONNECT packet:
- *                     - keepalive: The Keep Alive timer value.
- *                     - client_id: The Client Identifier.
- *                     - username: The Username, if the username flag is set.
- *                     - password: The Password, if the password flag is set.
- *                     - will_topic: The Will Topic, if the will flag is set.
- *                     - will_message: The Will Message, if the will flag is
- * set.
- */
+// MQTT v5.0 Property Identifiers
+enum mqtt_property_type {
+  PROP_PAYLOAD_FORMAT_INDICATOR = 1,
+  PROP_MESSAGE_EXPIRY_INTERVAL = 2,
+  PROP_CONTENT_TYPE = 3,
+  PROP_RESPONSE_TOPIC = 8,
+  PROP_CORRELATION_DATA = 9,
+  PROP_SUBSCRIPTION_IDENTIFIER = 11,
+  PROP_SESSION_EXPIRY_INTERVAL = 17,
+  PROP_ASSIGNED_CLIENT_IDENTIFIER = 18,
+  PROP_SERVER_KEEP_ALIVE = 19,
+  PROP_AUTHENTICATION_METHOD = 21,
+  PROP_AUTHENTICATION_DATA = 22,
+  PROP_REQUEST_PROBLEM_INFORMATION = 23,
+  PROP_WILL_DELAY_INTERVAL = 24,
+  PROP_REQUEST_RESPONSE_INFORMATION = 25,
+  PROP_RESPONSE_INFORMATION = 26,
+  PROP_SERVER_REFERENCE = 28,
+  PROP_REASON_STRING = 31,
+  PROP_RECEIVE_MAXIMUM = 33,
+  PROP_TOPIC_ALIAS_MAXIMUM = 34,
+  PROP_TOPIC_ALIAS = 35,
+  PROP_MAXIMUM_QOS = 36,
+  PROP_RETAIN_AVAILABLE = 37,
+  PROP_USER_PROPERTY = 38,
+  PROP_MAXIMUM_PACKET_SIZE = 39,
+  PROP_WILDCARD_SUBSCRIPTION_AVAILABLE = 40,
+  PROP_SUBSCRIPTION_IDENTIFIER_AVAILABLE = 41,
+  PROP_SHARED_SUBSCRIPTION_AVAILABLE = 42
+};
+
+// Structure to hold a single property
+struct mqtt_property {
+  enum mqtt_property_type type;
+  union {
+    uint8_t byte;
+    uint16_t word;
+    uint32_t dword;
+    struct {
+      uint16_t len;
+      char *data;
+    } string;
+    struct {
+      uint16_t key_len;
+      char *key;
+      uint16_t value_len;
+      char *value;
+    } user_property;
+  } value;
+};
+
+// Structure to hold a list of properties
+struct mqtt_properties {
+  uint32_t length;            // Total length of all properties
+  uint32_t count;             // Number of properties
+  struct mqtt_property *list; // Dynamic array of properties
+};
+
 struct mqtt_connect {
   union mqtt_header header;
   union {
@@ -166,28 +191,10 @@ struct mqtt_connect {
     unsigned char *will_topic;
     unsigned char *will_message;
   } payload;
+  struct mqtt_properties properties;
+  struct mqtt_properties will_properties;
 };
 
-// Reference: 3.2
-/*
- * Represents an MQTT CONNACK packet structure.
- *
- * This struct encapsulates the fields of an MQTT CONNACK (Connection
- * Acknowledgement) packet, which is sent by the server in response to a
- * client's CONNECT packet.
- *
- * @field header           The fixed header for the MQTT packet.
- * @field byte             A union member to access all connect acknowledge
- * flags as a single byte.
- * @field bits             A bitfield struct to access individual connect
- * acknowledge flags:
- *                         - session_present: Indicates whether the server
- * already has a session for the client.
- *                         - reserved: The remaining 7 bits are reserved and
- * should be set to 0.
- * @field rc               The Connect Return code, indicating the result of the
- * connection request. Possible values are defined in the MQTT specification.
- */
 struct mqtt_connack {
   union mqtt_header header;
   union {
@@ -198,26 +205,19 @@ struct mqtt_connack {
     } bits;
   };
   unsigned char rc;
+  struct mqtt_properties properties;
 };
 
-// reference: 3.8
+struct mqtt_publish {
+  union mqtt_header header;
+  unsigned short pkt_id;
+  unsigned short topiclen;
+  unsigned char *topic;
+  unsigned short payloadlen;
+  unsigned char *payload;
+  struct mqtt_properties properties;
+};
 
-/*
- * Represents an MQTT SUBSCRIBE packet structure.
- *
- * This struct encapsulates the fields necessary for an MQTT SUBSCRIBE packet,
- * which is sent from the Client to the Server to create one or more
- * Subscriptions.
- *
- * @field header       The fixed header for the MQTT packet.
- * @field pkt_id       The Packet Identifier for this SUBSCRIBE packet.
- * @field tuples_len   The number of Topic Filter/QoS pairs in the packet.
- * @field tuples       An array of Topic Filter/QoS pairs:
- *                     - topic_len: The length of the Topic Filter.
- *                     - topic: The Topic Filter, a UTF-8 encoded string.
- *                     - qos: The maximum QoS level at which the Server can send
- *                            Application Messages to the Client.
- */
 struct mqtt_subscribe {
   union mqtt_header header;
   unsigned short pkt_id;
@@ -227,9 +227,9 @@ struct mqtt_subscribe {
     unsigned char *topic;
     unsigned qos;
   } *tuples;
+  struct mqtt_properties properties;
 };
 
-// Reference 3.10
 struct mqtt_unsubscribe {
   union mqtt_header header;
   unsigned short pkt_id;
@@ -238,30 +238,21 @@ struct mqtt_unsubscribe {
     unsigned short topic_len;
     unsigned char *topic;
   } *tuples;
+  struct mqtt_properties properties;
 };
 
-// Reference 3.9
 struct mqtt_suback {
   union mqtt_header header;
   unsigned short pkt_id;
   unsigned short rcslen;
   unsigned char *rcs;
+  struct mqtt_properties properties;
 };
 
-// Reference: 3.3
-struct mqtt_publish {
-  union mqtt_header header;
-  unsigned short pkt_id;
-  unsigned short topiclen;
-  unsigned char *topic;
-  unsigned short payloadlen;
-  unsigned char *payload;
-};
-
-// Reference: 3.4, can be used for all other Acknowledgement headers
 struct mqtt_ack {
   union mqtt_header header;
   unsigned short pkt_id;
+  struct mqtt_properties properties;
 };
 
 typedef struct mqtt_ack mqtt_puback;
@@ -269,9 +260,14 @@ typedef struct mqtt_ack mqtt_pubrec;
 typedef struct mqtt_ack mqtt_pubrel;
 typedef struct mqtt_ack mqtt_pubcomp;
 typedef struct mqtt_ack mqtt_unsuback;
+
+struct mqtt_disconnect {
+  union mqtt_header header;
+  struct mqtt_properties properties;
+};
+
 typedef union mqtt_header mqtt_pingreq;
 typedef union mqtt_header mqtt_pingresp;
-typedef union mqtt_header mqtt_disconnect;
 
 union mqtt_packet {
   struct mqtt_ack ack;
@@ -282,9 +278,10 @@ union mqtt_packet {
   struct mqtt_publish publish;
   struct mqtt_subscribe subscribe;
   struct mqtt_unsubscribe unsubscribe;
+  struct mqtt_disconnect disconnect;
 };
 
-// Source: 2.2.3
+// Function prototypes
 int mqtt_encode_length(unsigned char *, size_t);
 int mqtt_decode_length(const unsigned char **, unsigned long *);
 
@@ -302,4 +299,15 @@ struct mqtt_publish *mqtt_packet_publish(unsigned char, unsigned short, size_t,
                                          unsigned char *);
 void mqtt_packet_release(union mqtt_packet *, unsigned);
 
-#endif
+// New function prototypes for properties
+int mqtt_property_add(struct mqtt_properties *props,
+                      struct mqtt_property *prop);
+struct mqtt_property *mqtt_property_get(struct mqtt_properties *props,
+                                        enum mqtt_property_type type);
+void mqtt_properties_free(struct mqtt_properties *props);
+int mqtt_properties_encode(struct mqtt_properties *props, unsigned char *buf,
+                           size_t buflen);
+int mqtt_properties_decode(const unsigned char *buf, size_t buflen,
+                           struct mqtt_properties *props);
+
+#endif // MQTT_H
