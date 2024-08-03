@@ -7,7 +7,7 @@
 uint8_t mqtt_unpack_u8(const uint8_t **buf);
 uint16_t mqtt_unpack_u16(const uint8_t **buf);
 uint32_t mqtt_unpack_u32(const uint8_t **buf);
-unsigned char* mqtt_unpack_string(const uint8_t **buf, uint32_t *length);
+unsigned char* mqtt_unpack_string(const uint8_t **buf, uint16_t *length);
 
 // Packing functions
 void mqtt_pack_u8(uint8_t **buf, uint8_t val);

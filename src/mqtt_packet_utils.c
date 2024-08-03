@@ -26,7 +26,7 @@ uint32_t mqtt_unpack_u32(const uint8_t **buf) {
 }
 
 
-unsigned char *mqtt_unpack_string(const uint8_t **buf, uint32_t *length) {
+unsigned char *mqtt_unpack_string(const uint8_t **buf, uint16_t *length) {
   *length = mqtt_unpack_u16(buf);
   unsigned char *str = malloc(*length + 1);
   if (str == NULL) {
