@@ -172,17 +172,20 @@ struct mqtt_properties {
   struct mqtt_property *list; // Dynamic array of properties
 };
 
+//we can skip checking the protocol name and version for right now
+//TODO: Check the protocol name later
+
 struct mqtt_connect {
   union mqtt_header header;
   union {
     unsigned char byte;
     struct {
-      unsigned int reserved : 1;
+      unsigned int reserved : 1; // TODO: must validate this is set to 0
       unsigned int clean_session : 1;
       unsigned int will : 1;
       unsigned int will_qos : 2;
       unsigned int will_retain : 1;
-      unsigned int password : 1;
+      unsigned int password : 1; // can send without username
       unsigned int username : 1;
     } bits;
   };

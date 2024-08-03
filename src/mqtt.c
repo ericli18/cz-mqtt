@@ -69,6 +69,7 @@ static size_t unpack_mqtt_connect(const unsigned char *buf,
                                   union mqtt_packet *pkt) {
   struct mqtt_connect connect = {.header = *hdr};
   pkt->connect = connect;
+
   const unsigned char *init = buf;
   const unsigned char *packet_end;
 
@@ -79,10 +80,11 @@ static size_t unpack_mqtt_connect(const unsigned char *buf,
     fprintf(stderr, "Error decoding remaining length\n");
     return 0;
   }
+
   packet_end = buf + remaining_length;
 
   /* Skip protocol name and version (8 bytes) */
-  buf += 8;
+  buf += 7;
 
   /* Read variable header byte flags */
   pkt->connect.byte = mqtt_unpack_u8((const uint8_t **)&buf);
