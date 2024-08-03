@@ -59,7 +59,7 @@
 #define UNSUBACK_BYTE 0xB0
 #define PINGRESP_BYTE 0xD0
 
-// Reference: 2.2.1 MQTT Control Packet type
+// Reference: 2.1.2 MQTT Control Packet type
 enum packet_type {
   CONNECT = 1,
   CONNACK = 2,
@@ -74,7 +74,8 @@ enum packet_type {
   UNSUBACK = 11,
   PINGREQ = 12,
   PINGRESP = 13,
-  DISCONNECT = 14
+  DISCONNECT = 14,
+  AUTH = 15,
 };
 
 // Reference: 3.3.1.2 QoS
@@ -102,12 +103,15 @@ enum qos_level { AT_MOST_ONCE, AT_LEAST_ONCE, EXACTLY_ONCE };
  *              - type: The MQTT Control Packet type (values 1-14).
  */
 union mqtt_header {
-  unsigned char byte;
+  uint8_t byte;
+  
+  //other than type, the flags are used for 
+  // PUBLISH type, which can use these
   struct {
-    unsigned int retain : 1;
-    unsigned int qos : 2;
-    unsigned int dup : 1;
-    unsigned int type : 4;
+    unsigned retain : 1;
+    unsigned qos : 2;
+    unsigned dup : 1;
+    unsigned type : 4;
   } bits;
 };
 
@@ -165,7 +169,6 @@ struct mqtt_property {
 // Structure to hold a list of properties
 struct mqtt_properties {
   uint32_t length;            // Total length of all properties
-  uint32_t count;             // Number of properties
   struct mqtt_property *list; // Dynamic array of properties
 };
 
