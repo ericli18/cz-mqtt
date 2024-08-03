@@ -10,6 +10,7 @@ uint8_t mqtt_unpack_u8(const uint8_t **buf) {
   return val;
 }
 
+//this is for unpacking strings, strings are preceded by the most significant bit
 uint16_t mqtt_unpack_u16(const uint8_t **buf) {
   uint16_t val;
   memcpy(&val, *buf, sizeof(uint16_t));
@@ -24,26 +25,6 @@ uint32_t mqtt_unpack_u32(const uint8_t **buf) {
   return ntohl(val);
 }
 
-// This is useful for the fixed header and also other encoding functions in mqtt
-// v5
-uint32_t mqtt_unpack_variable_int(const uint8_t **buf, uint32_t *bytes_read) {
-  uint32_t multiplier = 1;
-  uint32_t value = 0;
-  uint8_t encoded_byte;
-  *bytes_read = 0;
-
-  do {
-    encoded_byte = mqtt_unpack_u8(buf);
-    value += (encoded_byte & 127) * multiplier;
-    multiplier *= 128;
-    (*bytes_read)++;
-    if (multiplier > 128 * 128 * 128) {
-      return 0; // Malformed variable int
-    }
-  } while ((encoded_byte & 128) != 0);
-
-  return value;
-}
 
 unsigned char *mqtt_unpack_string(const uint8_t **buf, uint32_t *length) {
   *length = mqtt_unpack_u16(buf);
@@ -72,17 +53,6 @@ void mqtt_pack_u32(uint8_t **buf, uint32_t val) {
   uint32_t netval = htonl(val);
   memcpy(*buf, &netval, sizeof(uint32_t));
   *buf += sizeof(uint32_t);
-}
-
-void mqtt_pack_variable_int(uint8_t **buf, uint32_t val) {
-  do {
-    uint8_t encoded_byte = val % 128;
-    val /= 128;
-    if (val > 0) {
-      encoded_byte |= 128;
-    }
-    mqtt_pack_u8(buf, encoded_byte);
-  } while (val > 0);
 }
 
 void mqtt_pack_string(uint8_t **buf, const char *str, uint16_t length) {
