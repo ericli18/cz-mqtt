@@ -1,5 +1,6 @@
 #include "mqtt.h"
 #include "mqtt_packet_utils.h"
+#include <bits/types/struct_iovec.h>
 #include <msgpack.h>
 #include <msgpack/unpack.h>
 #include <stdint.h>
@@ -93,117 +94,128 @@ static size_t unpack_mqtt_connect(const unsigned char *buf,
   pkt->connect.payload.keepalive = mqtt_unpack_u16((const uint8_t **)&buf);
 
   /* Read Properties (MQTT v5.0) */
-  uint32_t properties_length;
-  mqtt_unpack_variable_int(&buf, &properties_length);
-  if (properties_length > 0) {
-    const unsigned char *properties_end = buf + properties_length;
-    while (buf < properties_end) {
-      struct mqtt_property prop;
-      prop.type =
-          (enum mqtt_property_type)mqtt_unpack_u8((const uint8_t **)&buf);
+  size_t properties_length;
+  status = mqtt_decode_length(&buf, &properties_length);
+  // TODO: Handle error
 
-      switch (prop.type) {
-      case PROP_SESSION_EXPIRY_INTERVAL:
-      case PROP_MESSAGE_EXPIRY_INTERVAL:
-      case PROP_WILL_DELAY_INTERVAL:
-      case PROP_MAXIMUM_PACKET_SIZE:
-        prop.value.dword = mqtt_unpack_u32((const uint8_t **)&buf);
-        break;
-      case PROP_AUTHENTICATION_METHOD:
-      case PROP_AUTHENTICATION_DATA:
-      case PROP_CONTENT_TYPE:
-      case PROP_RESPONSE_TOPIC:
-      case PROP_ASSIGNED_CLIENT_IDENTIFIER:
-      case PROP_SERVER_REFERENCE:
-      case PROP_REASON_STRING:
-      case PROP_RESPONSE_INFORMATION:
-        // String properties
-        mqtt_unpack_variable_int(&buf, (uint32_t *)&prop.value.string.len);
-        prop.value.string.data = (char *)malloc(prop.value.string.len + 1);
-        memcpy(prop.value.string.data, buf, prop.value.string.len);
-        prop.value.string.data[prop.value.string.len] = '\0';
-        buf += prop.value.string.len;
-        break;
-      case PROP_SERVER_KEEP_ALIVE:
-      case PROP_RECEIVE_MAXIMUM:
-      case PROP_TOPIC_ALIAS_MAXIMUM:
-      case PROP_TOPIC_ALIAS:
-        prop.value.word = mqtt_unpack_u16((const uint8_t **)&buf);
-        break;
-      case PROP_PAYLOAD_FORMAT_INDICATOR:
-      case PROP_REQUEST_PROBLEM_INFORMATION:
-      case PROP_REQUEST_RESPONSE_INFORMATION:
-      case PROP_MAXIMUM_QOS:
-      case PROP_RETAIN_AVAILABLE:
-      case PROP_WILDCARD_SUBSCRIPTION_AVAILABLE:
-      case PROP_SUBSCRIPTION_IDENTIFIER_AVAILABLE:
-      case PROP_SHARED_SUBSCRIPTION_AVAILABLE:
-        prop.value.byte = mqtt_unpack_u8((const uint8_t **)&buf);
-        break;
-      case PROP_USER_PROPERTY:
-        mqtt_unpack_variable_int(&buf,
-                                 (uint32_t *)&prop.value.user_property.key_len);
-        prop.value.user_property.key =
-            (char *)malloc(prop.value.user_property.key_len + 1);
-        memcpy(prop.value.user_property.key, buf,
-               prop.value.user_property.key_len);
-        prop.value.user_property.key[prop.value.user_property.key_len] = '\0';
-        buf += prop.value.user_property.key_len;
+  // if (properties_length > 0) {
+  //   const unsigned char *properties_end = buf + properties_length;
+  //   while (buf < properties_end) {
+  //     struct mqtt_property prop;
+  //     prop.type =
+  //         (enum mqtt_property_type)mqtt_unpack_u8((const uint8_t **)&buf);
 
-        mqtt_unpack_variable_int(
-            &buf, (uint32_t *)&prop.value.user_property.value_len);
-        prop.value.user_property.value =
-            (char *)malloc(prop.value.user_property.value_len + 1);
-        memcpy(prop.value.user_property.value, buf,
-               prop.value.user_property.value_len);
-        prop.value.user_property.value[prop.value.user_property.value_len] =
-            '\0';
-        buf += prop.value.user_property.value_len;
-        break;
-      case PROP_SUBSCRIPTION_IDENTIFIER:
-      case PROP_CORRELATION_DATA:
-        // These properties have variable-length fields
-        mqtt_unpack_variable_int(&buf, (uint32_t *)&prop.value.string.len);
-        prop.value.string.data = (char *)malloc(prop.value.string.len);
-        memcpy(prop.value.string.data, buf, prop.value.string.len);
-        buf += prop.value.string.len;
-        break;
-      default:
-        fprintf(stderr, "Unknown property ID: %d\n", prop.type);
-        return 0;
-      }
+  //     switch (prop.type) {
+  //     case PROP_SESSION_EXPIRY_INTERVAL:
+  //     case PROP_MESSAGE_EXPIRY_INTERVAL:
+  //     case PROP_WILL_DELAY_INTERVAL:
+  //     case PROP_MAXIMUM_PACKET_SIZE:
+  //       prop.value.dword = mqtt_unpack_u32((const uint8_t **)&buf);
+  //       break;
+  //     case PROP_AUTHENTICATION_METHOD:
+  //     case PROP_AUTHENTICATION_DATA:
+  //     case PROP_CONTENT_TYPE:
+  //     case PROP_RESPONSE_TOPIC:
+  //     case PROP_ASSIGNED_CLIENT_IDENTIFIER:
+  //     case PROP_SERVER_REFERENCE:
+  //     case PROP_REASON_STRING:
+  //     case PROP_RESPONSE_INFORMATION:
+  //       // String properties
+  //       mqtt_unpack_variable_int(&buf, (uint32_t *)&prop.value.string.len);
+  //       prop.value.string.data = (char *)malloc(prop.value.string.len + 1);
+  //       memcpy(prop.value.string.data, buf, prop.value.string.len);
+  //       prop.value.string.data[prop.value.string.len] = '\0';
+  //       buf += prop.value.string.len;
+  //       break;
+  //     case PROP_SERVER_KEEP_ALIVE:
+  //     case PROP_RECEIVE_MAXIMUM:
+  //     case PROP_TOPIC_ALIAS_MAXIMUM:
+  //     case PROP_TOPIC_ALIAS:
+  //       prop.value.word = mqtt_unpack_u16((const uint8_t **)&buf);
+  //       break;
+  //     case PROP_PAYLOAD_FORMAT_INDICATOR:
+  //     case PROP_REQUEST_PROBLEM_INFORMATION:
+  //     case PROP_REQUEST_RESPONSE_INFORMATION:
+  //     case PROP_MAXIMUM_QOS:
+  //     case PROP_RETAIN_AVAILABLE:
+  //     case PROP_WILDCARD_SUBSCRIPTION_AVAILABLE:
+  //     case PROP_SUBSCRIPTION_IDENTIFIER_AVAILABLE:
+  //     case PROP_SHARED_SUBSCRIPTION_AVAILABLE:
+  //       prop.value.byte = mqtt_unpack_u8((const uint8_t **)&buf);
+  //       break;
+  //     case PROP_USER_PROPERTY:
+  //       mqtt_unpack_variable_int(&buf,
+  //                                (uint32_t
+  //                                *)&prop.value.user_property.key_len);
+  //       prop.value.user_property.key =
+  //           (char *)malloc(prop.value.user_property.key_len + 1);
+  //       memcpy(prop.value.user_property.key, buf,
+  //              prop.value.user_property.key_len);
+  //       prop.value.user_property.key[prop.value.user_property.key_len] =
+  //       '\0'; buf += prop.value.user_property.key_len;
 
-      if (mqtt_property_add(&pkt->connect.properties, &prop) != 0) {
-        fprintf(stderr, "Failed to add property\n");
-        return 0;
-      }
-    }
+  //       mqtt_unpack_variable_int(
+  //           &buf, (uint32_t *)&prop.value.user_property.value_len);
+  //       prop.value.user_property.value =
+  //           (char *)malloc(prop.value.user_property.value_len + 1);
+  //       memcpy(prop.value.user_property.value, buf,
+  //              prop.value.user_property.value_len);
+  //       prop.value.user_property.value[prop.value.user_property.value_len] =
+  //           '\0';
+  //       buf += prop.value.user_property.value_len;
+  //       break;
+  //     case PROP_SUBSCRIPTION_IDENTIFIER:
+  //     case PROP_CORRELATION_DATA:
+  //       // These properties have variable-length fields
+  //       mqtt_unpack_variable_int(&buf, (uint32_t *)&prop.value.string.len);
+  //       prop.value.string.data = (char *)malloc(prop.value.string.len);
+  //       memcpy(prop.value.string.data, buf, prop.value.string.len);
+  //       buf += prop.value.string.len;
+  //       break;
+  //     default:
+  //       fprintf(stderr, "Unknown property ID: %d\n", prop.type);
+  //       return 0;
+  //     }
 
-    if (buf != properties_end) {
-      fprintf(stderr, "Property length mismatch\n");
-      return 0;
-    }
-  }
+  //     if (mqtt_property_add(&pkt->connect.properties, &prop) != 0) {
+  //       fprintf(stderr, "Failed to add property\n");
+  //       return 0;
+  //     }
+  //   }
+
+  //   if (buf != properties_end) {
+  //     fprintf(stderr, "Property length mismatch\n");
+  //     return 0;
+  //   }
+  // }
+
+  buf += properties_length;
   /* Read Client ID */
-  uint32_t cid_len;
-  mqtt_unpack_variable_int(&buf, &cid_len);
+  uint16_t cid_len;
+  cid_len = mqtt_unpack_u16(&buf);
   if (cid_len > 0) {
     pkt->connect.payload.client_id =
         mqtt_unpack_string((const uint8_t **)&buf, &cid_len);
     if (pkt->connect.payload.client_id == NULL) {
       return 0;
     }
+  } else {
+    // TODO: create client id
   }
 
-  /* Read Will Topic and Message if Will flag is set */
   if (pkt->connect.bits.will == 1) {
-    uint32_t will_topic_len, will_message_len;
-    mqtt_unpack_variable_int(&buf, &will_topic_len);
-    pkt->connect.payload.will_topic =
-        mqtt_unpack_string((const uint8_t **)&buf, &will_topic_len);
-    mqtt_unpack_variable_int(&buf, &will_message_len);
-    pkt->connect.payload.will_message =
-        mqtt_unpack_string((const uint8_t **)&buf, &will_message_len);
+    size_t will_properties_len;
+    mqtt_decode_length(&buf, &will_properties_len);
+    buf+= will_properties_len;
+
+    // TODO: Handle properties later too.... and the error
+
+    uint16_t will_topic_len;
+    will_topic_len = mqtt_unpack_u16(&buf);
+    
+    pkt->connect.payload.will_topic = mqtt_unpack_string(&buf, &will_topic_len);
+    //TODO: WTF is the will payload
+
   }
 
   /* Read Username if username flag is set */
