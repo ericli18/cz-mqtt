@@ -10,7 +10,8 @@ uint8_t mqtt_unpack_u8(const uint8_t **buf) {
   return val;
 }
 
-//this is for unpacking strings, strings are preceded by the most significant bit
+// this is for unpacking strings, strings are preceded by the most significant
+// bit
 uint16_t mqtt_unpack_u16(const uint8_t **buf) {
   uint16_t val;
   memcpy(&val, *buf, sizeof(uint16_t));
@@ -25,18 +26,25 @@ uint32_t mqtt_unpack_u32(const uint8_t **buf) {
   return ntohl(val);
 }
 
-
-unsigned char *mqtt_unpack_string(const uint8_t **buf, uint16_t *length) {
-  *length = mqtt_unpack_u16(buf);
-  unsigned char *str = malloc(*length + 1);
+unsigned char *mqtt_unpack_string(const uint8_t **buf) {
+  uint16_t length = mqtt_unpack_u16(buf);
+  unsigned char *str = malloc(length + 1);
   if (str == NULL) {
     return NULL; // Memory allocation failed
   }
-  memcpy(str, *buf, *length);
-  str[*length] = '\0';
-  *buf += *length;
+  memcpy(str, *buf, length);
+  str[length] = '\0';
+  *buf += length;
   return str;
 }
+
+uint8_t *unpack_bytes(const uint8_t **buf, size_t len, uint8_t *str) {
+    memcpy(str, *buf, len);
+    str[len] = '\0';
+    (*buf) += len;
+    return str;
+}
+
 
 void mqtt_pack_u8(uint8_t **buf, uint8_t val) {
   **buf = val;
