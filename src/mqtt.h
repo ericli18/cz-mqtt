@@ -116,61 +116,61 @@ union mqtt_header {
 };
 
 // MQTT v5.0 Property Identifiers
-enum mqtt_property_type {
-  PROP_PAYLOAD_FORMAT_INDICATOR = 1,
-  PROP_MESSAGE_EXPIRY_INTERVAL = 2,
-  PROP_CONTENT_TYPE = 3,
-  PROP_RESPONSE_TOPIC = 8,
-  PROP_CORRELATION_DATA = 9,
-  PROP_SUBSCRIPTION_IDENTIFIER = 11,
-  PROP_SESSION_EXPIRY_INTERVAL = 17,
-  PROP_ASSIGNED_CLIENT_IDENTIFIER = 18,
-  PROP_SERVER_KEEP_ALIVE = 19,
-  PROP_AUTHENTICATION_METHOD = 21,
-  PROP_AUTHENTICATION_DATA = 22,
-  PROP_REQUEST_PROBLEM_INFORMATION = 23,
-  PROP_WILL_DELAY_INTERVAL = 24,
-  PROP_REQUEST_RESPONSE_INFORMATION = 25,
-  PROP_RESPONSE_INFORMATION = 26,
-  PROP_SERVER_REFERENCE = 28,
-  PROP_REASON_STRING = 31,
-  PROP_RECEIVE_MAXIMUM = 33,
-  PROP_TOPIC_ALIAS_MAXIMUM = 34,
-  PROP_TOPIC_ALIAS = 35,
-  PROP_MAXIMUM_QOS = 36,
-  PROP_RETAIN_AVAILABLE = 37,
-  PROP_USER_PROPERTY = 38,
-  PROP_MAXIMUM_PACKET_SIZE = 39,
-  PROP_WILDCARD_SUBSCRIPTION_AVAILABLE = 40,
-  PROP_SUBSCRIPTION_IDENTIFIER_AVAILABLE = 41,
-  PROP_SHARED_SUBSCRIPTION_AVAILABLE = 42
-};
+// enum mqtt_property_type {
+//   PROP_PAYLOAD_FORMAT_INDICATOR = 1,
+//   PROP_MESSAGE_EXPIRY_INTERVAL = 2,
+//   PROP_CONTENT_TYPE = 3,
+//   PROP_RESPONSE_TOPIC = 8,
+//   PROP_CORRELATION_DATA = 9,
+//   PROP_SUBSCRIPTION_IDENTIFIER = 11,
+//   PROP_SESSION_EXPIRY_INTERVAL = 17,
+//   PROP_ASSIGNED_CLIENT_IDENTIFIER = 18,
+//   PROP_SERVER_KEEP_ALIVE = 19,
+//   PROP_AUTHENTICATION_METHOD = 21,
+//   PROP_AUTHENTICATION_DATA = 22,
+//   PROP_REQUEST_PROBLEM_INFORMATION = 23,
+//   PROP_WILL_DELAY_INTERVAL = 24,
+//   PROP_REQUEST_RESPONSE_INFORMATION = 25,
+//   PROP_RESPONSE_INFORMATION = 26,
+//   PROP_SERVER_REFERENCE = 28,
+//   PROP_REASON_STRING = 31,
+//   PROP_RECEIVE_MAXIMUM = 33,
+//   PROP_TOPIC_ALIAS_MAXIMUM = 34,
+//   PROP_TOPIC_ALIAS = 35,
+//   PROP_MAXIMUM_QOS = 36,
+//   PROP_RETAIN_AVAILABLE = 37,
+//   PROP_USER_PROPERTY = 38,
+//   PROP_MAXIMUM_PACKET_SIZE = 39,
+//   PROP_WILDCARD_SUBSCRIPTION_AVAILABLE = 40,
+//   PROP_SUBSCRIPTION_IDENTIFIER_AVAILABLE = 41,
+//   PROP_SHARED_SUBSCRIPTION_AVAILABLE = 42
+// };
 
-// Structure to hold a single property
-struct mqtt_property {
-  enum mqtt_property_type type;
-  union {
-    uint8_t byte;
-    uint16_t word;
-    uint32_t dword;
-    struct {
-      uint16_t len;
-      char *data;
-    } string;
-    struct {
-      uint16_t key_len;
-      char *key;
-      uint16_t value_len;
-      char *value;
-    } user_property;
-  } value;
-};
+// // Structure to hold a single property
+// struct mqtt_property {
+//   enum mqtt_property_type type;
+//   union {
+//     uint8_t byte;
+//     uint16_t word;
+//     uint32_t dword;
+//     struct {
+//       uint16_t len;
+//       char *data;
+//     } string;
+//     struct {
+//       uint16_t key_len;
+//       char *key;
+//       uint16_t value_len;
+//       char *value;
+//     } user_property;
+//   } value;
+// };
 
-// Structure to hold a list of properties
-struct mqtt_properties {
-  uint32_t length;            // Total length of all properties
-  struct mqtt_property *list; // Dynamic array of properties
-};
+// // Structure to hold a list of properties
+// struct mqtt_properties {
+//   uint32_t length;            // Total length of all properties
+//   struct mqtt_property *list; // Dynamic array of properties
+// };
 
 //we can skip checking the protocol name and version for right now
 //TODO: Check the protocol name later
@@ -197,8 +197,6 @@ struct mqtt_connect {
     unsigned char *will_topic;
     unsigned char *will_message;
   } payload;
-  struct mqtt_properties properties;
-  struct mqtt_properties will_properties;
 };
 
 struct mqtt_connack {
@@ -211,7 +209,6 @@ struct mqtt_connack {
     } bits;
   };
   unsigned char rc;
-  struct mqtt_properties properties;
 };
 
 struct mqtt_publish {
@@ -221,7 +218,6 @@ struct mqtt_publish {
   unsigned char *topic;
   unsigned short payloadlen;
   unsigned char *payload;
-  struct mqtt_properties properties;
 };
 
 struct mqtt_subscribe {
@@ -233,7 +229,6 @@ struct mqtt_subscribe {
     unsigned char *topic;
     unsigned qos;
   } *tuples;
-  struct mqtt_properties properties;
 };
 
 struct mqtt_unsubscribe {
@@ -244,7 +239,6 @@ struct mqtt_unsubscribe {
     unsigned short topic_len;
     unsigned char *topic;
   } *tuples;
-  struct mqtt_properties properties;
 };
 
 struct mqtt_suback {
@@ -252,13 +246,11 @@ struct mqtt_suback {
   unsigned short pkt_id;
   unsigned short rcslen;
   unsigned char *rcs;
-  struct mqtt_properties properties;
 };
 
 struct mqtt_ack {
   union mqtt_header header;
   unsigned short pkt_id;
-  struct mqtt_properties properties;
 };
 
 typedef struct mqtt_ack mqtt_puback;
@@ -269,7 +261,6 @@ typedef struct mqtt_ack mqtt_unsuback;
 
 struct mqtt_disconnect {
   union mqtt_header header;
-  struct mqtt_properties properties;
 };
 
 typedef union mqtt_header mqtt_pingreq;
@@ -304,16 +295,5 @@ struct mqtt_publish *mqtt_packet_publish(unsigned char, unsigned short, size_t,
                                          unsigned char *, size_t,
                                          unsigned char *);
 void mqtt_packet_release(union mqtt_packet *, unsigned);
-
-// New function prototypes for properties
-int mqtt_property_add(struct mqtt_properties *props,
-                      struct mqtt_property *prop);
-struct mqtt_property *mqtt_property_get(struct mqtt_properties *props,
-                                        enum mqtt_property_type type);
-void mqtt_properties_free(struct mqtt_properties *props);
-int mqtt_properties_encode(struct mqtt_properties *props, unsigned char *buf,
-                           size_t buflen);
-int mqtt_properties_decode(const unsigned char *buf, size_t buflen,
-                           struct mqtt_properties *props);
 
 #endif // MQTT_H
